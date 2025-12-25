@@ -88,7 +88,7 @@ async function extractTextAndImages(page) {
     }
 }
 
-// Composite extracted content on page template
+// Composite extracted content on page template with realistic texture
 function compositeOnPageTemplate(extractedContent) {
     return new Promise((resolve) => {
         const canvas = document.createElement('canvas');
@@ -100,10 +100,14 @@ function compositeOnPageTemplate(extractedContent) {
             canvas.width = templateImg.width;
             canvas.height = templateImg.height;
             
-            ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
-            
+            // Draw PDF content first
             const contentImg = new Image();
             contentImg.onload = () => {
+                // Fill with white background
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw scaled PDF content
                 const scale = Math.min(
                     (canvas.width * 0.85) / contentImg.width,
                     (canvas.height * 0.85) / contentImg.height
@@ -115,6 +119,14 @@ function compositeOnPageTemplate(extractedContent) {
                 const y = (canvas.height - scaledHeight) / 2;
                 
                 ctx.drawImage(contentImg, x, y, scaledWidth, scaledHeight);
+                
+                // Apply page texture with multiply blend mode for realism
+                ctx.globalCompositeOperation = 'multiply';
+                ctx.globalAlpha = 0.95; // Slightly transparent for natural look
+                ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
+                ctx.globalAlpha = 1.0;
+                ctx.globalCompositeOperation = 'source-over';
+                
                 resolve(canvas.toDataURL());
             };
             contentImg.src = extractedContent.imageData;
