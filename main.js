@@ -507,33 +507,18 @@ function handleDragMove(e) {
     const normalizedDrag = Math.max(-maxDrag, Math.min(maxDrag, dragDistance));
     const progress = Math.min(Math.abs(normalizedDrag) / maxDrag, 1);
     
-    // Allow flipping from any page including covers
+    // SINGLE PAGE VIEW - always use rightPage for flip animation
     if (normalizedDrag < 0 && currentPage < numPages - 1) {
         // Dragging left - flip forward
-        const targetPage = currentPage === 0 ? leftPage : rightPage;
-        applyPageCurl(targetPage, progress, 1);
-        if (currentPage === 0) {
-            rightPage.style.transform = '';
-            rightPage.style.boxShadow = '';
-            rightPage.style.background = '';
-        } else {
-            leftPage.style.transform = '';
-            leftPage.style.boxShadow = '';
-            leftPage.style.background = '';
-        }
+        applyPageCurl(rightPage, progress, 1);
     } else if (normalizedDrag > 0 && currentPage > 0) {
         // Dragging right - flip backward
-        const targetPage = currentPage === numPages - 1 ? rightPage : leftPage;
-        applyPageCurl(targetPage, progress, -1);
-        if (currentPage === numPages - 1) {
-            leftPage.style.transform = '';
-            leftPage.style.boxShadow = '';
-            leftPage.style.background = '';
-        } else {
-            rightPage.style.transform = '';
-            rightPage.style.boxShadow = '';
-            rightPage.style.background = '';
-        }
+        applyPageCurl(rightPage, progress, -1);
+    } else {
+        // Reset if can't flip
+        rightPage.style.transform = '';
+        rightPage.style.boxShadow = '';
+        rightPage.style.background = '';
     }
 }
 
@@ -550,11 +535,8 @@ function handleDragEnd() {
             const maxDrag = 150;
             const normalizedDrag = Math.max(-maxDrag, Math.min(maxDrag, dragDistance));
             const progress = Math.min(Math.abs(normalizedDrag) / maxDrag, 1);
-            const targetPage = dragDistance < 0 
-                ? (currentPage === 0 ? leftPage : rightPage)
-                : (currentPage === numPages - 1 ? rightPage : leftPage);
             const direction = dragDistance < 0 ? 1 : -1;
-            animateSnapBack(targetPage, progress, direction);
+            animateSnapBack(rightPage, progress, direction);
             dragStart = 0;
             dragCurrent = 0;
             dragVelocity = 0;
@@ -578,20 +560,17 @@ function handleDragEnd() {
     if (progress >= dragThreshold || momentumComplete) {
         // User dragged past halfway OR has enough momentum - complete flip
         if (dragDistance < 0 && currentPage < numPages - 1) {
-            const targetPage = currentPage === 0 ? leftPage : rightPage;
-            completeFlipWithMomentum(targetPage, progress, 1, currentPage + 1, dragVelocity);
+            // Flip forward
+            completeFlipWithMomentum(rightPage, progress, 1, currentPage + 1, dragVelocity);
             currentPage = currentPage + 1;
         } else if (dragDistance > 0 && currentPage > 0) {
-            const targetPage = currentPage === numPages - 1 ? rightPage : leftPage;
-            completeFlipWithMomentum(targetPage, progress, -1, currentPage - 1, dragVelocity);
+            // Flip backward
+            completeFlipWithMomentum(rightPage, progress, -1, currentPage - 1, dragVelocity);
             currentPage = currentPage - 1;
         } else {
             // Can't flip, snap back
-            const targetPage = dragDistance < 0 
-                ? (currentPage === 0 ? leftPage : rightPage)
-                : (currentPage === numPages - 1 ? rightPage : leftPage);
             const direction = dragDistance < 0 ? 1 : -1;
-            animateSnapBack(targetPage, progress, direction);
+            animateSnapBack(rightPage, progress, direction);
             dragStart = 0;
             dragCurrent = 0;
             dragVelocity = 0;
@@ -601,11 +580,8 @@ function handleDragEnd() {
         updateButtons();
     } else {
         // Didn't drag far enough and no momentum - snap back smoothly
-        const targetPage = dragDistance < 0 
-            ? (currentPage === 0 ? leftPage : rightPage)
-            : (currentPage === numPages - 1 ? rightPage : leftPage);
         const direction = dragDistance < 0 ? 1 : -1;
-        animateSnapBack(targetPage, progress, direction);
+        animateSnapBack(rightPage, progress, direction);
     }
     
     dragStart = 0;
