@@ -167,13 +167,15 @@ async function renderPageToImage(pageIndex) {
             return pageImages[pageIndex];
         }
         
-        // PDF pages are indexed 1 to pdfDoc.numPages
-        const pdfPageNum = pageIndex;
+        // PDF.js pages start at 1, not 0
+        // pageIndex 1 (first page after front cover) = PDF page 1
+        // Our pageIndex: 0=front, 1=pdf1, 2=pdf2, ..., last=back
+        const pdfPageNum = pageIndex; // pageIndex already maps correctly since we start at 1
         
         console.log(`Rendering page ${pageIndex} (PDF page ${pdfPageNum})`);
         
         if (!pdfDoc || pdfPageNum < 1 || pdfPageNum > pdfDoc.numPages) {
-            console.warn(`Invalid page ${pdfPageNum}`);
+            console.warn(`Invalid page ${pdfPageNum}, PDF has pages 1-${pdfDoc?.numPages}`);
             renderQueue = renderQueue.filter(p => p !== pageIndex);
             return null;
         }
@@ -184,7 +186,7 @@ async function renderPageToImage(pageIndex) {
         if (extractedContent) {
             const compositedPage = await compositeOnPageTemplate(extractedContent);
             pageCache[pageIndex] = compositedPage;
-            console.log(`Successfully rendered page ${pageIndex}`);
+            console.log(`✓ Successfully rendered page ${pageIndex}`);
             renderQueue = renderQueue.filter(p => p !== pageIndex);
             return compositedPage;
         }
@@ -226,7 +228,7 @@ async function processPDF(arrayBuffer) {
         const pdf = await pdfjsLib.getDocument(typedArray).promise;
         pdfDoc = pdf;
         
-        console.log(`PDF loaded with ${pdf.numPages} pages`);
+        console.log(`📄 PDF loaded with ${pdf.numPages} pages`);
         
         // Set page count (covers + PDF pages)
         numPages = pdf.numPages + 2;
@@ -274,7 +276,10 @@ pdfUpload.addEventListener('change', async (e) => {
 
 // Update page display - SINGLE PAGE VIEW
 function updateDisplay() {
-    console.log(`Updating display: currentPage=${currentPage}, numPages=${numPages}`);
+    console.log(`========================================`);
+    console.log(`UPDATE DISPLAY: currentPage=${currentPage}, numPages=${numPages}`);
+    console.log(`Page in cache? ${!!pageCache[currentPage]}`);
+    console.log(`========================================`);
     
     // Reset transforms and shadows
     currentPageEl.style.transform = '';
@@ -289,20 +294,20 @@ function updateDisplay() {
     
     if (pageCache[pageToLoad]) {
         currentPageImg.src = pageCache[pageToLoad];
-        console.log(`Loaded cached page ${pageToLoad}`);
+        console.log(`✓ Loaded cached page ${pageToLoad}`);
     } else {
         // Show placeholder while loading
         currentPageImg.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23f0f0f0%22 width=%22100%22 height=%22100%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22%3ELoading...%3C/text%3E%3C/svg%3E';
-        console.log(`Rendering page ${pageToLoad}...`);
+        console.log(`⏳ Rendering page ${pageToLoad}...`);
         
         renderPageToImage(pageToLoad).then(img => {
             if (img && pageToLoad === currentPage) {
                 currentPageImg.src = img;
                 pageCache[pageToLoad] = img;
-                console.log(`Successfully loaded page ${pageToLoad}`);
+                console.log(`✓ Successfully loaded page ${pageToLoad}`);
             }
         }).catch(err => {
-            console.error('Error rendering page:', pageToLoad, err);
+            console.error('❌ Error rendering page:', pageToLoad, err);
         });
     }
     
@@ -357,14 +362,14 @@ function updateButtons() {
 
 // Animated flip to specific page
 function flipToPage(pageNum) {
-    console.log(`flipToPage called: pageNum=${pageNum}, currentPage=${currentPage}, isFlipping=${isFlipping}`);
+    console.log(`🔄 flipToPage called: pageNum=${pageNum}, currentPage=${currentPage}, isFlipping=${isFlipping}`);
     
     if (isFlipping || pageNum < 0 || pageNum >= numPages) {
-        console.log(`Flip blocked: isFlipping=${isFlipping}, pageNum=${pageNum}, valid=${pageNum >= 0 && pageNum < numPages}`);
+        console.log(`❌ Flip blocked: isFlipping=${isFlipping}, pageNum=${pageNum}, valid=${pageNum >= 0 && pageNum < numPages}`);
         return;
     }
     if (pageNum === currentPage) {
-        console.log(`Already on page ${pageNum}`);
+        console.log(`ℹ️ Already on page ${pageNum}`);
         return;
     }
     
@@ -372,6 +377,8 @@ function flipToPage(pageNum) {
     const direction = pageNum > currentPage ? 1 : -1;
     const startTime = performance.now();
     const duration = ANIMATION_DURATION;
+    
+    console.log(`✓ Starting flip animation: direction=${direction > 0 ? 'forward' : 'backward'}`);
     
     function animate(currentTime) {
         const elapsed = currentTime - startTime;
@@ -387,6 +394,7 @@ function flipToPage(pageNum) {
             updateDisplay();
             updateButtons();
             isFlipping = false;
+            console.log(`✓ Flip complete, now on page ${currentPage}`);
         }
     }
     
@@ -395,14 +403,14 @@ function flipToPage(pageNum) {
 
 // Navigation
 prevBtn.addEventListener('click', () => {
-    console.log('Prev button clicked');
+    console.log('⬅️ Prev button clicked');
     if (currentPage > 0) {
         flipToPage(currentPage - 1);
     }
 });
 
 nextBtn.addEventListener('click', () => {
-    console.log('Next button clicked');
+    console.log('➡️ Next button clicked');
     if (currentPage < numPages - 1) {
         flipToPage(currentPage + 1);
     }
@@ -427,7 +435,7 @@ function getClientX(e) {
 function handleDragStart(e) {
     if (isFlipping) return;
     
-    console.log('Drag started');
+    console.log('👆 Drag started');
     isDragging = true;
     dragStart = getClientX(e);
     dragCurrent = dragStart;
@@ -478,13 +486,17 @@ function handleDragEnd() {
     isDragging = false;
     
     const dragDistance = dragCurrent - dragStart;
-    console.log(`Drag ended: distance=${dragDistance}, currentPage=${currentPage}`);
+    console.log(`========================================`);
+    console.log(`👋 DRAG END: distance=${dragDistance}px, currentPage=${currentPage}`);
+    console.log(`Can flip forward? ${currentPage < numPages - 1}`);
+    console.log(`Can flip backward? ${currentPage > 0}`);
+    console.log(`========================================`);
     
     // Mobile flip cooldown
     const now = Date.now();
     if (isMobileDevice() || isTouch()) {
         if (now - lastFlipTime < MOBILE_FLIP_COOLDOWN) {
-            console.log('Flip cooldown active, snapping back');
+            console.log('⏱️ Flip cooldown active, snapping back');
             animateSnapBack();
             return;
         }
@@ -496,20 +508,20 @@ function handleDragEnd() {
     if (Math.abs(dragDistance) >= threshold) {
         if (dragDistance < 0 && currentPage < numPages - 1) {
             // Flip forward
-            console.log('Flipping forward');
+            console.log('➡️ Flipping forward');
             lastFlipTime = now;
             flipToPage(currentPage + 1);
         } else if (dragDistance > 0 && currentPage > 0) {
             // Flip backward
-            console.log('Flipping backward');
+            console.log('⬅️ Flipping backward');
             lastFlipTime = now;
             flipToPage(currentPage - 1);
         } else {
-            console.log('Cannot flip, snapping back');
+            console.log('🚫 Cannot flip, snapping back');
             animateSnapBack();
         }
     } else {
-        console.log('Drag distance too small, snapping back');
+        console.log(`📏 Drag distance (${Math.abs(dragDistance)}px) < threshold (${threshold}px), snapping back`);
         animateSnapBack();
     }
     
@@ -586,4 +598,4 @@ pageCache[0] = 'assets/front-cover.jpg';
 updateDisplay();
 updateButtons();
 
-console.log('Flip book initialized');
+console.log('📖 Flip book initialized - Ready for PDF upload!');
