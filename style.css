@@ -134,10 +134,12 @@ body {
     user-select: none;
     -webkit-user-select: none;
     touch-action: pan-y;
-    gap: 1rem;
+    gap: 0;
     align-items: center;
     justify-content: center;
     max-width: 100%;
+    width: 100%;
+    height: 100%;
 }
 
 .book:active {maximize available height on mobile */
@@ -167,14 +169,14 @@ body {
 }
 
 .left-page {
-    display: none;
+    display: none !important;
     transform-origin: right center;
 }
 
 .right-page {
     transform-origin: left center;
     width: 100% !important;
-    max-width: 500px;
+    max-width: none !important;
 }
 
 .page.flipping-left {
@@ -308,99 +310,78 @@ body {
     /* Mobile optimization - Maximize page area */
     body { padding: 0; }
     .container { 
-        padding: 0.5rem; 
-        gap: 0.5rem;
+        padding: 0; 
+        gap: 0;
         height: 100dvh;
     }
     
     .header { 
-        padding: 0.5rem 0;
+        padding: 0.4rem 0.5rem;
         flex-shrink: 0;
+        background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
     }
     .header h1 { 
-        font-size: 1.2rem;
-        margin-bottom: 0.25rem;
+        font-size: 1rem;
+        margin-bottom: 0;
     }
     
     .upload-btn {
-        padding: 0.4rem 0.75rem;
-        font-size: 0.75rem;
+        padding: 0.3rem 0.6rem;
+        font-size: 0.65rem;
     }
     
     .controls { 
-        gap: 0.25rem;
-        padding: 0.4rem;
+        gap: 0.2rem;
+        padding: 0.35rem 0.5rem;
         flex-shrink: 0;
+        background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
+        border-bottom: 1px solid rgba(0,0,0,0.1);
     }
     
     .control-btn { 
-        padding: 0.35rem;
-        min-width: 36px;
-        min-height: 36px;
+        padding: 0.3rem;
+        min-width: 32px;
+        min-height: 32px;
     }
     
     .control-btn svg {
-        width: 18px;
-        height: 18px;
+        width: 16px;
+        height: 16px;
     }
     
     .page-info { 
-        font-size: 0.7rem;
+        font-size: 0.65rem;
         flex-shrink: 0;
     }
     
     .zoom-controls { 
-        gap: 0.2rem;
-        margin-left: 0.25rem;
+        gap: 0.15rem;
+        margin-left: 0.2rem;
     }
     
     .page { 
-        max-width: 95vw;
-        max-height: 75vh;
-        border-radius: 0.25rem;
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100vw !important;
+        max-height: calc(100dvh - 100px) !important;
+        border-radius: 0;
+        box-shadow: none;
     }
     
     .page-number { 
-        font-size: 0.65rem;
-        padding: 0.15rem 0.3rem;
-        bottom: 0.5rem;
-        right: 0.5rem;
+        font-size: 0.6rem;
+        padding: 0.1rem 0.25rem;
+        bottom: 0.3rem;
+        right: 0.3rem;
     }
     
     .book-spine { display: none; }
     
     .thumbnails { display: none !important; }
     
-    /* Landscape orientation */
-    @media (orientation: landscape) {
-        .container {
-            padding: 0.3rem;
-            gap: 0.3rem;
-        }
-        
-        .header {
-            display: none; /* Hide header in landscape */
-        }
-        
-        .controls {
-            padding: 0.3rem;
-            gap: 0.2rem;
-            position: fixed;
-            bottom: 0.3rem;
-            left: 0.3rem;
-            right: 0.3rem;
-            z-index: 100;
-            background: rgba(254, 243, 199, 0.95);
-            border-radius: 0.5rem;
-        }
-        
-        .book-container {
-            height: calc(100dvh - 60px);
-        }
-        
-        .page {
-            max-height: 95vh;
-        }
+    .book-container {
+        flex: 1;
+        overflow: hidden;
     }
 }
 
