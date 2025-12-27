@@ -21,6 +21,16 @@ let scale = 1;
 let flipProgress = 0;
 let animationFrame = null;
 
+// Mobile detection and sensitivity settings
+const isMobileDevice = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+const isTouch = () => window.matchMedia('(hover: none)').matches;
+const MOBILE_DRAG_THRESHOLD = 40; // Increased threshold for mobile (default 30)
+const DESKTOP_DRAG_THRESHOLD = 30;
+const MOBILE_FLIP_COOLDOWN = 400; // Prevent rapid flips on mobile
+const ANIMATION_DURATION_MOBILE = 600;
+const ANIMATION_DURATION_DESKTOP = 400;
+let lastFlipTime = 0;
+
 // DOM elements
 const pdfUpload = document.getElementById('pdfUpload');
 const uploadText = document.getElementById('uploadText');
@@ -517,7 +527,14 @@ function handleDragMove(e) {
     // Calculate velocity for momentum
     const now = Date.now();
     const timeDelta = Math.max(now - dragTimestamp, 1);
-    dragVelocity = (dragCurrent - dragPrevious) / timeDelta * 16; // Normalized to 60fps
+    let velocity = (dragCurrent - dragPrevious) / timeDelta * 16; // Normalized to 60fps
+    
+    // Reduce velocity on mobile devices for smoother experience
+    if (isMobileDevice() || isTouch()) {
+        velocity *= 0.5; // 50% velocity reduction on mobile
+    }
+    
+    dragVelocity = velocity;
     dragPrevious = dragCurrent;
     dragTimestamp = now;
     
@@ -560,17 +577,41 @@ function handleDragEnd() {
     if (!isDragging) return;
     isDragging = false;
     
+    // Mobile flip cooldown - prevent rapid consecutive flips
+    const now = Date.now();
+    if (isMobileDevice() || isTouch()) {
+        if (now - lastFlipTime < MOBILE_FLIP_COOLDOWN) {
+            // Snap back if too soon after last flip
+            const dragDistance = dragCurrent - dragStart;
+            const maxDrag = 150;
+            const normalizedDrag = Math.max(-maxDrag, Math.min(maxDrag, dragDistance));
+            const progress = Math.min(Math.abs(normalizedDrag) / maxDrag, 1);
+            const targetPage = dragDistance < 0 
+                ? (currentPage === 0 ? leftPage : rightPage)
+                : (currentPage === numPages - 1 ? rightPage : leftPage);
+            const direction = dragDistance < 0 ? 1 : -1;
+            animateSnapBack(targetPage, progress, direction);
+            dragStart = 0;
+            dragCurrent = 0;
+            dragVelocity = 0;
+            return;
+        }
+        lastFlipTime = now;
+    }
+    
     const dragDistance = dragCurrent - dragStart;
     const maxDrag = 150;
     const normalizedDrag = Math.max(-maxDrag, Math.min(maxDrag, dragDistance));
     const progress = Math.min(Math.abs(normalizedDrag) / maxDrag, 1);
-    const threshold = 0.3; // Lower threshold for easier flipping
+    
+    // Use higher threshold on mobile devices
+    const dragThreshold = (isMobileDevice() || isTouch()) ? 0.4 : 0.3;
     
     // Calculate if momentum should complete the flip
     const momentumThreshold = 0.3; // Velocity threshold
     const momentumComplete = Math.abs(dragVelocity) > momentumThreshold;
     
-    if (progress >= threshold || momentumComplete) {
+    if (progress >= dragThreshold || momentumComplete) {
         // User dragged past halfway OR has enough momentum - complete flip
         if (dragDistance < 0 && currentPage < numPages - 1) {
             const targetPage = currentPage === 0 ? leftPage : rightPage;
@@ -587,6 +628,9 @@ function handleDragEnd() {
                 : (currentPage === numPages - 1 ? rightPage : leftPage);
             const direction = dragDistance < 0 ? 1 : -1;
             animateSnapBack(targetPage, progress, direction);
+            dragStart = 0;
+            dragCurrent = 0;
+            dragVelocity = 0;
             return;
         }
         updateDisplay();
@@ -654,15 +698,88 @@ function resetPageTransforms() {
     }, 10);
 }
 
+// Pinch-to-zoom functionality for touch devices
+let initialPinchDistance = 0;
+let currentPinchScale = 1;
+let pinchStartScale = 1;
+
+function getPinchDistance(e) {
+    if (e.touches.length < 2) return 0;
+    const touch1 = e.touches[0];
+    const touch2 = e.touches[1];
+    const dx = touch1.clientX - touch2.clientX;
+    const dy = touch1.clientY - touch2.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
+function handlePinchStart(e) {
+    if (e.touches.length === 2) {
+        initialPinchDistance = getPinchDistance(e);
+        pinchStartScale = scale;
+    }
+}
+
+function handlePinchMove(e) {
+    if (e.touches.length === 2 && initialPinchDistance > 0) {
+        e.preventDefault();
+        const currentDistance = getPinchDistance(e);
+        const scaleFactor = currentDistance / initialPinchDistance;
+        
+        // Calculate new scale (min 1x, max 3x)
+        currentPinchScale = Math.min(Math.max(pinchStartScale * scaleFactor, 1), 3);
+        
+        // Apply zoom to current page
+        const currentPageElement = currentPage === 0 ? leftPage : rightPage;
+        if (currentPageElement) {
+            currentPageElement.style.transform = `scale(${currentPinchScale})`;
+            // Adjust transform origin to center
+            currentPageElement.style.transformOrigin = 'center';
+            currentPageElement.style.transition = 'none';
+        }
+    }
+}
+
+function handlePinchEnd(e) {
+    if (e.touches.length < 2) {
+        initialPinchDistance = 0;
+        scale = currentPinchScale;
+        
+        // Smooth transition back if zoomed out
+        const currentPageElement = currentPage === 0 ? leftPage : rightPage;
+        if (currentPageElement) {
+            currentPageElement.style.transition = 'transform 0.3s ease-out';
+        }
+    }
+}
+
 // Add event listeners for drag/swipe
 book.addEventListener('mousedown', handleDragStart);
 book.addEventListener('mousemove', handleDragMove);
 book.addEventListener('mouseup', handleDragEnd);
 book.addEventListener('mouseleave', handleDragEnd);
 
-book.addEventListener('touchstart', handleDragStart, { passive: false });
-book.addEventListener('touchmove', handleDragMove, { passive: false });
-book.addEventListener('touchend', handleDragEnd);
+book.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+        handlePinchStart(e);
+    } else {
+        handleDragStart(e);
+    }
+}, { passive: false });
+
+book.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 2) {
+        handlePinchMove(e);
+    } else {
+        handleDragMove(e);
+    }
+}, { passive: false });
+
+book.addEventListener('touchend', (e) => {
+    if (e.touches.length < 2) {
+        handlePinchEnd(e);
+    }
+    handleDragEnd();
+});
 
 // Add visual cursor feedback
 book.style.cursor = 'grab';
