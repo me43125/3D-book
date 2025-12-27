@@ -234,7 +234,7 @@ body {
     max-width: 100%;
     padding: 1rem;
     flex-shrink: 0
-
+}
 .thumbnails {
     display: flex;
     gap: 0.5rem;
