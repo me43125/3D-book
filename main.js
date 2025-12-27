@@ -311,12 +311,20 @@ function updateDisplay() {
     
     // Load current page into right page display
     if (pageCache[currentPage]) {
-        setPageImage(rightPageImg, pageCache[currentPage]);
+        // Image is already cached, use it
+        const cachedImage = pageCache[currentPage];
+        rightPageImg.src = cachedImage;
     } else {
+        // Image not cached, show placeholder and render
         rightPageImg.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23f0f0f0%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E';
         const pageToLoad = currentPage;
         renderPageToImage(pageToLoad).then(img => {
-            if (img && pageToLoad === currentPage) setPageImage(rightPageImg, img);
+            if (img && pageToLoad === currentPage) {
+                rightPageImg.src = img;
+                pageCache[pageToLoad] = img;
+            }
+        }).catch(err => {
+            console.error('Error rendering page:', pageToLoad, err);
         });
     }
     
