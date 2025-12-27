@@ -116,14 +116,14 @@ body {
 .book-container {
     perspective: 2000px;
     transition: transform 0.3s;
+    width: 100%;
     height: 100%;
     flex: 1;
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 0; /* Allow flex to shrink */
-    overflow: hidden
-    justify-content: center;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .book {
@@ -135,8 +135,8 @@ body {
     -webkit-user-select: none;
     touch-action: pan-y;
     gap: 0;
-    align-items: center;
-    justify-content: center;
+    align-items: stretch;
+    justify-content: flex-start;
     max-width: 100%;
     width: 100%;
     height: 100%;
@@ -170,6 +170,11 @@ body {
 
 .left-page {
     display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
     transform-origin: right center;
 }
 
@@ -177,6 +182,7 @@ body {
     transform-origin: left center;
     width: 100% !important;
     max-width: none !important;
+    flex-grow: 1 !important;
 }
 
 .page.flipping-left {
@@ -330,12 +336,16 @@ body {
         font-size: 0.65rem;
     }
     
-    .controls { 
-        gap: 0.2rem;
-        padding: 0.35rem 0.5rem;
-        flex-shrink: 0;
-        background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
-        border-bottom: 1px solid rgba(0,0,0,0.1);
+    .book { 
+        gap: 0;
+        width: 100%;
+        height: 100%;
+    }
+    
+    .book-container {
+        flex: 1;
+        overflow: hidden;
+        width: 100%;
     }
     
     .control-btn { 
@@ -366,6 +376,13 @@ body {
         max-height: calc(100dvh - 100px) !important;
         border-radius: 0;
         box-shadow: none;
+        flex-shrink: 0 !important;
+        flex-grow: 1 !important;
+    }
+    
+    .right-page {
+        width: 100% !important;
+        max-width: 100% !important;
     }
     
     .page-number { 
