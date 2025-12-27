@@ -515,7 +515,9 @@ function handleDragMove(e) {
     dragTimestamp = now;
     
     const dragDistance = dragCurrent - dragStart;
-    const maxDrag = 150;
+    // Make maxDrag proportional to page width for better mobile UX
+    const pageWidth = rightPage.offsetWidth || window.innerWidth * 0.9;
+    const maxDrag = pageWidth * 0.3; // 30% of page width required to flip
     const normalizedDrag = Math.max(-maxDrag, Math.min(maxDrag, dragDistance));
     const progress = Math.min(Math.abs(normalizedDrag) / maxDrag, 1);
     
@@ -544,7 +546,8 @@ function handleDragEnd() {
         if (now - lastFlipTime < MOBILE_FLIP_COOLDOWN) {
             // Snap back if too soon after last flip
             const dragDistance = dragCurrent - dragStart;
-            const maxDrag = 150;
+            const pageWidth = rightPage.offsetWidth || window.innerWidth * 0.9;
+            const maxDrag = pageWidth * 0.3;
             const normalizedDrag = Math.max(-maxDrag, Math.min(maxDrag, dragDistance));
             const progress = Math.min(Math.abs(normalizedDrag) / maxDrag, 1);
             const direction = dragDistance < 0 ? 1 : -1;
@@ -558,7 +561,9 @@ function handleDragEnd() {
     }
     
     const dragDistance = dragCurrent - dragStart;
-    const maxDrag = 150;
+    // Make maxDrag proportional to page width for better mobile UX
+    const pageWidth = rightPage.offsetWidth || window.innerWidth * 0.9;
+    const maxDrag = pageWidth * 0.3; // 30% of page width required to flip
     const normalizedDrag = Math.max(-maxDrag, Math.min(maxDrag, dragDistance));
     const progress = Math.min(Math.abs(normalizedDrag) / maxDrag, 1);
     
