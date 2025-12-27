@@ -289,7 +289,7 @@ pdfUpload.addEventListener('change', async (e) => {
     reader.readAsArrayBuffer(file);
 });
 
-// Update page display with lazy loading
+// Update page display with lazy loading - SINGLE PAGE VIEW
 function updateDisplay() {
     // Reset transforms and shadows
     leftPage.style.transform = '';
@@ -299,64 +299,28 @@ function updateDisplay() {
     leftPage.style.background = '';
     rightPage.style.background = '';
     
-    // Handle front cover (page 0) - show alone, hide right page
-    if (currentPage === 0) {
-        setPageImage(leftPageImg, pageImages[0]);
-        rightPageImg.src = '';
-        leftPageNum.textContent = '1';
-        rightPageNum.style.display = 'none';
-        rightPage.style.display = 'none';
-        leftPage.style.width = 'min(88vw, 840px)';
-        pageInfo.textContent = `Front Cover of ${numPages}`;
+    // SINGLE PAGE VIEW - only show right page with current page content
+    leftPageImg.src = '';
+    leftPageNum.style.display = 'none';
+    leftPage.style.display = 'none';
+    
+    rightPage.style.display = 'block';
+    rightPageNum.style.display = 'block';
+    rightPageNum.textContent = currentPage + 1;
+    rightPage.style.width = '';
+    
+    // Load current page into right page display
+    if (pageCache[currentPage]) {
+        setPageImage(rightPageImg, pageCache[currentPage]);
+    } else {
+        rightPageImg.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23f0f0f0%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E';
+        const pageToLoad = currentPage;
+        renderPageToImage(pageToLoad).then(img => {
+            if (img && pageToLoad === currentPage) setPageImage(rightPageImg, img);
+        });
     }
-    // Handle back cover (last page) - show alone, hide left page
-    else if (currentPage === numPages - 1) {
-        leftPageImg.src = '';
-        setPageImage(rightPageImg, pageImages[numPages - 1]);
-        leftPageNum.style.display = 'none';
-        rightPageNum.textContent = numPages;
-        rightPageNum.style.display = 'block';
-        leftPage.style.display = 'none';
-        rightPage.style.display = 'block';
-        rightPage.style.width = 'min(88vw, 840px)';
-        pageInfo.textContent = `Back Cover of ${numPages}`;
-    }
-    // Show paired pages
-    else {
-        // Load left page
-        if (pageCache[currentPage]) {
-            setPageImage(leftPageImg, pageCache[currentPage]);
-        } else {
-            leftPageImg.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23f0f0f0%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E'; // Placeholder
-            const pageToLoad = currentPage;
-            renderPageToImage(pageToLoad).then(img => {
-                if (img && pageToLoad === currentPage) setPageImage(leftPageImg, img);
-            });
-        }
-        
-        // Load right page
-        if (pageCache[currentPage + 1]) {
-            setPageImage(rightPageImg, pageCache[currentPage + 1]);
-        } else {
-            rightPageImg.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23f0f0f0%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E'; // Placeholder
-            const pageToLoad = currentPage + 1;
-            renderPageToImage(pageToLoad).then(img => {
-                if (img && pageToLoad === currentPage + 1) setPageImage(rightPageImg, img);
-            });
-        }
-        
-        leftPageNum.textContent = currentPage + 1;
-        leftPageNum.style.display = 'block';
-        rightPageNum.textContent = currentPage + 2;
-        rightPageNum.style.display = 'block';
-        
-        leftPage.style.display = 'block';
-        rightPage.style.display = 'block';
-        leftPage.style.width = '';
-        rightPage.style.width = '';
-        
-        pageInfo.textContent = `Page ${currentPage + 1}-${currentPage + 2} of ${numPages}`;
-    }
+    
+    pageInfo.textContent = `Page ${currentPage + 1} of ${numPages}`;
     
     // Pre-load adjacent pages
     preloadAdjacentPages(currentPage);
@@ -407,7 +371,7 @@ function updateThumbnails() {
 
 // Update button states
 function updateButtons() {
-    prevBtn.disabled = currentPage === 0;
+    prevBtn.disabled = currentPage <= 0;
     nextBtn.disabled = currentPage >= numPages - 1;
 }
 
