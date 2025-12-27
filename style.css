@@ -25,7 +25,6 @@ body {
     align-items: center;
     gap: 1rem;
     width: 100%;
-    max-width: 1200px;
     height: 100vh;
     max-height: 100dvh; /* Dynamic viewport height for mobile */
     overflow: hidden;
@@ -111,7 +110,6 @@ body {
 .zoom-controls {
     display: flex;
     gap: 0.5rem;
-    margin-left: 1rem;
 }
 
 .book-container {
@@ -307,23 +305,6 @@ body {
     color: white;
     font-size: 1.25rem;
     font-weight: 600;
-}
-
-@media (max-width: 992px) {
-    .page { max-width: 360px; }
-    .book { gap: 0.6rem; }
-    .thumbnails { display: flex; } /* Show on tablets */
-}
-
-@media (max-width: 768px) {
-    /* Tablet optimization */
-    .container { max-width: 100%; gap: 0.8rem; padding: 0.5rem; }
-    .page { max-width: 400px; aspect-ratio: 3/4; }
-    .book { gap: 0.5rem; }
-    .control-btn { padding: 0.4rem; }
-    .zoom-controls { margin-left: 0.5rem; }
-    .thumbnails { display: flex; }
-    .book-container { padding: 0.5rem; }
 }
 
 @media (max-width: 600px) {
