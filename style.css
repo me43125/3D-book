@@ -170,18 +170,23 @@ body {
 
 .left-page {
     display: none !important;
+    visibility: hidden !important;
     width: 0 !important;
     height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
     border: none !important;
+    overflow: hidden !important;
     transform-origin: right center;
+    flex: 0 !important;
+    min-width: 0 !important;
 }
 
 .right-page {
     transform-origin: left center;
     width: 100% !important;
-    max-width: none !important;
+    max-width: 100% !important;
+    flex: 1 !important;
     flex-grow: 1 !important;
 }
 

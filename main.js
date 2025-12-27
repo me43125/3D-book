@@ -343,14 +343,15 @@ function setPageImage(imgElement, src) {
     }
 }
 
-// Update thumbnails with lazy loading support
+// Update thumbnails with lazy loading support - SINGLE PAGE VIEW
 function updateThumbnails() {
     thumbnails.innerHTML = '';
     
     for (let idx = 0; idx < numPages; idx++) {
         const thumb = document.createElement('div');
         thumb.className = 'thumbnail';
-        if (idx === currentPage || idx === currentPage + 1) {
+        // Only highlight current page in single-page view
+        if (idx === currentPage) {
             thumb.classList.add('active');
         }
         thumb.dataset.page = idx;
@@ -364,7 +365,10 @@ function updateThumbnails() {
         } else if (idx < 5) {
             // Preload first few thumbnails
             renderPageToImage(idx).then(img => {
-                if (img) thumbImg.src = img;
+                if (img) {
+                    thumbImg.src = img;
+                    pageCache[idx] = img;
+                }
             });
         }
         
@@ -748,5 +752,8 @@ document.addEventListener('keydown', (e) => {
 });
 
 // Initialize display
+// Ensure initial page cache is set for cover
+pageCache[0] = 'assets/front-cover.jpg';
+pageCache[1] = 'assets/back-cover.jpg';
 updateDisplay();
 updateButtons();
