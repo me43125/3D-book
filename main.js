@@ -24,11 +24,10 @@ let animationFrame = null;
 // Mobile detection and sensitivity settings
 const isMobileDevice = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 const isTouch = () => window.matchMedia('(hover: none)').matches;
-const MOBILE_DRAG_THRESHOLD = 40; // Increased threshold for mobile (default 30)
+const MOBILE_DRAG_THRESHOLD = 50; // Pixels to drag before flip
 const DESKTOP_DRAG_THRESHOLD = 30;
-const MOBILE_FLIP_COOLDOWN = 400; // Prevent rapid flips on mobile
-const ANIMATION_DURATION_MOBILE = 600;
-const ANIMATION_DURATION_DESKTOP = 400;
+const MOBILE_FLIP_COOLDOWN = 300; // Prevent rapid flips on mobile
+const ANIMATION_DURATION = 400;
 let lastFlipTime = 0;
 
 // DOM elements
@@ -41,12 +40,9 @@ const zoomInBtn = document.getElementById('zoomInBtn');
 const zoomOutBtn = document.getElementById('zoomOutBtn');
 const bookContainer = document.getElementById('bookContainer');
 const book = document.getElementById('book');
-const leftPage = document.getElementById('leftPage');
-const rightPage = document.getElementById('rightPage');
-const leftPageImg = document.getElementById('leftPageImg');
-const rightPageImg = document.getElementById('rightPageImg');
-const leftPageNum = document.getElementById('leftPageNum');
-const rightPageNum = document.getElementById('rightPageNum');
+const currentPageEl = document.getElementById('currentPage');
+const currentPageImg = document.getElementById('currentPageImg');
+const currentPageNum = document.getElementById('currentPageNum');
 const thumbnails = document.getElementById('thumbnails');
 const loading = document.getElementById('loading');
 
@@ -57,36 +53,23 @@ function easeInOutCubic(t) {
 
 // Apply realistic page curl effect
 function applyPageCurl(element, progress, direction) {
-    // direction: 1 for right page flipping forward, -1 for left page flipping back
-    const angle = progress * -180 * direction;
+    // direction: 1 for flipping forward, -1 for flipping backward
+    const angle = progress * 180 * direction;
     const perspective = 1500;
-    const skew = Math.sin(progress * Math.PI) * 8 * -direction;
     const shadow = Math.sin(progress * Math.PI) * 0.6;
-    
-    // Enhanced 3D deformation with barrel distortion
-    const scaleX = 1 - (progress * 0.05); // Slight compression during flip
-    const scaleY = 1 + (progress * 0.02); // Slight stretch
-    const distortion = Math.sin(progress * Math.PI) * 3;
     
     element.style.transform = `
         perspective(${perspective}px)
         rotateY(${angle}deg)
-        skewY(${skew}deg)
-        scaleX(${scaleX})
-        scaleY(${scaleY})
     `;
     
-    // Enhanced shadow with darker underside
-    const underShadow = shadow * 0.5;
     element.style.boxShadow = `
-        ${direction > 0 ? '' : '-'}${shadow * 25}px 0 ${shadow * 50}px rgba(0,0,0,${shadow * 0.4}),
-        inset ${direction > 0 ? '' : '-'}${underShadow * 10}px 0 ${underShadow * 15}px rgba(0,0,0,${underShadow * 0.2})
+        ${direction > 0 ? '-' : ''}${shadow * 20}px 0 ${shadow * 40}px rgba(0,0,0,${shadow * 0.4})
     `;
     
-    // Gradient overlay for enhanced depth
     const gradient = direction > 0 
-        ? `linear-gradient(to right, rgba(0,0,0,${shadow * 0.25}), transparent 40%, rgba(255,255,255,${shadow * 0.1}))`
-        : `linear-gradient(to left, rgba(0,0,0,${shadow * 0.25}), transparent 40%, rgba(255,255,255,${shadow * 0.1}))`;
+        ? `linear-gradient(to left, rgba(0,0,0,${shadow * 0.2}), transparent 50%)`
+        : `linear-gradient(to right, rgba(0,0,0,${shadow * 0.2}), transparent 50%)`;
     
     element.style.background = gradient;
 }
@@ -149,7 +132,7 @@ function compositeOnPageTemplate(extractedContent) {
                 
                 // Apply page texture with multiply blend mode for realism
                 ctx.globalCompositeOperation = 'multiply';
-                ctx.globalAlpha = 0.95; // Slightly transparent for natural look
+                ctx.globalAlpha = 0.95;
                 ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
                 ctx.globalAlpha = 1.0;
                 ctx.globalCompositeOperation = 'source-over';
@@ -185,11 +168,13 @@ async function renderPageToImage(pageIndex) {
         }
         
         // PDF pages are indexed 1 to pdfDoc.numPages
-        // pageIndex 1 = PDF page 1, pageIndex 2 = PDF page 2, etc.
         const pdfPageNum = pageIndex;
         
-        console.log(`Rendering page ${pageIndex} (PDF page ${pdfPageNum}), total PDF pages: ${pdfDoc?.numPages}`);       if (!pdfDoc || pdfPageNum < 1 || pdfPageNum > pdfDoc.numPages) {
-            console.warn(`Invalid page ${pdfPageNum}, PDF pages: 1-${pdfDoc?.numPages}`);           renderQueue = renderQueue.filter(p => p !== pageIndex);
+        console.log(`Rendering page ${pageIndex} (PDF page ${pdfPageNum})`);
+        
+        if (!pdfDoc || pdfPageNum < 1 || pdfPageNum > pdfDoc.numPages) {
+            console.warn(`Invalid page ${pdfPageNum}`);
+            renderQueue = renderQueue.filter(p => p !== pageIndex);
             return null;
         }
         
@@ -218,12 +203,11 @@ async function preloadAdjacentPages(pageIndex) {
         pageIndex - 1,
         pageIndex + 2,
         pageIndex - 2
-    ].filter(p => p > 0 && p < numPages);
+    ].filter(p => p >= 0 && p < numPages);
     
-    // Start pre-loading in background (don't await)
     for (const pageIdx of pagesToPreload) {
         if (!pageCache[pageIdx] && !renderQueue.includes(pageIdx)) {
-            renderPageToImage(pageIdx).catch(() => {}); // Silent fail for bg loads
+            renderPageToImage(pageIdx).catch(() => {});
         }
     }
 }
@@ -234,19 +218,18 @@ async function processPDF(arrayBuffer) {
         loading.classList.add('active');
         
         // Clear previous PDF data
-        pageCache = {}; // Clear page cache
-        renderQueue = []; // Clear rendering queue
-        pageImages = ['assets/front-cover.jpg', 'assets/back-cover.jpg']; // Reset page images
+        pageCache = {};
+        renderQueue = [];
+        pageImages = ['assets/front-cover.jpg', 'assets/back-cover.jpg'];
         
         const typedArray = new Uint8Array(arrayBuffer);
-        
         const pdf = await pdfjsLib.getDocument(typedArray).promise;
         pdfDoc = pdf;
         
         console.log(`PDF loaded with ${pdf.numPages} pages`);
         
         // Set page count (covers + PDF pages)
-        numPages = pdf.numPages + 2; // +2 for front and back covers
+        numPages = pdf.numPages + 2;
         pageImages[0] = 'assets/front-cover.jpg';
         pageImages[numPages - 1] = 'assets/back-cover.jpg';
         
@@ -256,10 +239,10 @@ async function processPDF(arrayBuffer) {
         
         currentPage = 0;
         
-        // Start rendering first visible pages
+        // Start rendering first PDF pages in background
         console.log(`Starting to render pages 1-2`);
-        await renderPageToImage(1);
-        await renderPageToImage(2);
+        renderPageToImage(1);
+        renderPageToImage(2);
         
         updateDisplay();
         updateThumbnails();
@@ -289,46 +272,34 @@ pdfUpload.addEventListener('change', async (e) => {
     reader.readAsArrayBuffer(file);
 });
 
-// Update page display with lazy loading - SINGLE PAGE VIEW
+// Update page display - SINGLE PAGE VIEW
 function updateDisplay() {
+    console.log(`Updating display: currentPage=${currentPage}, numPages=${numPages}`);
+    
     // Reset transforms and shadows
-    leftPage.style.transform = '';
-    rightPage.style.transform = '';
-    leftPage.style.boxShadow = '';
-    rightPage.style.boxShadow = '';
-    leftPage.style.background = '';
-    rightPage.style.background = '';
+    currentPageEl.style.transform = '';
+    currentPageEl.style.boxShadow = '';
+    currentPageEl.style.background = '';
     
-    // SINGLE PAGE VIEW - forcefully hide left page
-    leftPageImg.src = '';
-    leftPageNum.style.display = 'none';
-    leftPage.style.display = 'none';
-    leftPage.style.visibility = 'hidden';
-    leftPage.style.width = '0';
-    leftPage.style.height = '0';
-    leftPage.style.margin = '0';
-    leftPage.style.padding = '0';
+    // Update page number
+    currentPageNum.textContent = currentPage + 1;
     
-    // Show right page
-    rightPage.style.display = 'block';
-    rightPage.style.visibility = 'visible';
-    rightPageNum.style.display = 'block';
-    rightPageNum.textContent = currentPage + 1;
-    rightPage.style.width = '';
+    // Load current page
+    const pageToLoad = currentPage;
     
-    // Load current page into right page display
-    if (pageCache[currentPage]) {
-        // Image is already cached, use it
-        const cachedImage = pageCache[currentPage];
-        rightPageImg.src = cachedImage;
+    if (pageCache[pageToLoad]) {
+        currentPageImg.src = pageCache[pageToLoad];
+        console.log(`Loaded cached page ${pageToLoad}`);
     } else {
-        // Image not cached, show placeholder and render
-        rightPageImg.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23f0f0f0%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E';
-        const pageToLoad = currentPage;
+        // Show placeholder while loading
+        currentPageImg.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23f0f0f0%22 width=%22100%22 height=%22100%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22%3ELoading...%3C/text%3E%3C/svg%3E';
+        console.log(`Rendering page ${pageToLoad}...`);
+        
         renderPageToImage(pageToLoad).then(img => {
             if (img && pageToLoad === currentPage) {
-                rightPageImg.src = img;
+                currentPageImg.src = img;
                 pageCache[pageToLoad] = img;
+                console.log(`Successfully loaded page ${pageToLoad}`);
             }
         }).catch(err => {
             console.error('Error rendering page:', pageToLoad, err);
@@ -343,21 +314,13 @@ function updateDisplay() {
     updateThumbnails();
 }
 
-// Helper to set page image (handles both URLs and base64)
-function setPageImage(imgElement, src) {
-    if (src) {
-        imgElement.src = src;
-    }
-}
-
-// Update thumbnails with lazy loading support - SINGLE PAGE VIEW
+// Update thumbnails - SINGLE PAGE VIEW
 function updateThumbnails() {
     thumbnails.innerHTML = '';
     
     for (let idx = 0; idx < numPages; idx++) {
         const thumb = document.createElement('div');
         thumb.className = 'thumbnail';
-        // Only highlight current page in single-page view
         if (idx === currentPage) {
             thumb.classList.add('active');
         }
@@ -366,11 +329,9 @@ function updateThumbnails() {
         const thumbImg = document.createElement('img');
         thumbImg.alt = `Page ${idx + 1}`;
         
-        // Set source or preload
         if (pageCache[idx]) {
             thumbImg.src = pageCache[idx];
         } else if (idx < 5) {
-            // Preload first few thumbnails
             renderPageToImage(idx).then(img => {
                 if (img) {
                     thumbImg.src = img;
@@ -394,77 +355,54 @@ function updateButtons() {
     nextBtn.disabled = currentPage >= numPages - 1;
 }
 
-// Complete flip animation with momentum
-function completeFlipWithMomentum(targetPage, startProgress, direction, targetPageNum, velocity) {
+// Animated flip to specific page
+function flipToPage(pageNum) {
+    console.log(`flipToPage called: pageNum=${pageNum}, currentPage=${currentPage}, isFlipping=${isFlipping}`);
+    
+    if (isFlipping || pageNum < 0 || pageNum >= numPages) {
+        console.log(`Flip blocked: isFlipping=${isFlipping}, pageNum=${pageNum}, valid=${pageNum >= 0 && pageNum < numPages}`);
+        return;
+    }
+    if (pageNum === currentPage) {
+        console.log(`Already on page ${pageNum}`);
+        return;
+    }
+    
     isFlipping = true;
+    const direction = pageNum > currentPage ? 1 : -1;
     const startTime = performance.now();
-    const remainingProgress = 1 - startProgress;
-    
-    // Velocity-based duration: faster drag = faster flip
-    const velocityFactor = Math.min(Math.abs(velocity) / 0.5, 1.5);
-    const baseDuration = remainingProgress * 600;
-    const duration = baseDuration / (0.5 + velocityFactor * 0.5);
-    
-    // Calculate momentum overshoot
-    const momentumOvershoot = Math.min(velocity * 50, 0.15);
-    const maxProgress = Math.min(1 + momentumOvershoot, 1.1);
+    const duration = ANIMATION_DURATION;
     
     function animate(currentTime) {
         const elapsed = currentTime - startTime;
         const rawProgress = Math.min(elapsed / duration, 1);
-        const easedProgress = easeInOutCubic(rawProgress);
+        const progress = easeInOutCubic(rawProgress);
         
-        // Interpolate from startProgress to maxProgress (with potential overshoot)
-        let currentProgress = startProgress + (easedProgress * (maxProgress - startProgress));
-        
-        // If we overshot, spring back smoothly
-        if (currentProgress > 1 && rawProgress < 1) {
-            const overshoot = currentProgress - 1;
-            const springBack = Math.sin(overshoot * Math.PI) * 0.1;
-            currentProgress = 1 - springBack;
-        }
-        
-        applyPageCurl(targetPage, currentProgress, direction);
+        applyPageCurl(currentPageEl, progress, direction);
         
         if (rawProgress < 1) {
             animationFrame = requestAnimationFrame(animate);
         } else {
-            // Animation complete
-            currentPage = targetPageNum;
+            currentPage = pageNum;
             updateDisplay();
             updateButtons();
             isFlipping = false;
-            flipProgress = 0;
         }
     }
     
     animationFrame = requestAnimationFrame(animate);
 }
 
-// Complete flip animation from current drag position
-function completeFlip(targetPage, startProgress, direction, targetPageNum) {
-    completeFlipWithMomentum(targetPage, startProgress, direction, targetPageNum, 0);
-}
-
-// Animated flip to specific page
-function flipToPage(pageNum) {
-    if (isFlipping || pageNum < 0 || pageNum >= numPages) return;
-    if (pageNum === currentPage) return;
-    
-    // Change page immediately
-    currentPage = pageNum;
-    updateDisplay();
-    updateButtons();
-}
-
 // Navigation
 prevBtn.addEventListener('click', () => {
+    console.log('Prev button clicked');
     if (currentPage > 0) {
         flipToPage(currentPage - 1);
     }
 });
 
 nextBtn.addEventListener('click', () => {
+    console.log('Next button clicked');
     if (currentPage < numPages - 1) {
         flipToPage(currentPage + 1);
     }
@@ -481,13 +419,15 @@ zoomOutBtn.addEventListener('click', () => {
     bookContainer.style.transform = `scale(${scale})`;
 });
 
-// Drag/Swipe functionality with smooth preview
+// Drag/Swipe functionality
 function getClientX(e) {
     return e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
 }
 
 function handleDragStart(e) {
     if (isFlipping) return;
+    
+    console.log('Drag started');
     isDragging = true;
     dragStart = getClientX(e);
     dragCurrent = dragStart;
@@ -495,7 +435,6 @@ function handleDragStart(e) {
     dragTimestamp = Date.now();
     dragVelocity = 0;
     
-    // Cancel any ongoing animation
     if (animationFrame) {
         cancelAnimationFrame(animationFrame);
         animationFrame = null;
@@ -505,41 +444,32 @@ function handleDragStart(e) {
 function handleDragMove(e) {
     if (!isDragging) return;
     e.preventDefault();
+    
     dragCurrent = getClientX(e);
     
-    // Calculate velocity for momentum
     const now = Date.now();
     const timeDelta = Math.max(now - dragTimestamp, 1);
-    let velocity = (dragCurrent - dragPrevious) / timeDelta * 16; // Normalized to 60fps
+    dragVelocity = (dragCurrent - dragPrevious) / timeDelta * 16;
     
-    // Reduce velocity on mobile devices for smoother experience
-    if (isMobileDevice() || isTouch()) {
-        velocity *= 0.5; // 50% velocity reduction on mobile
-    }
-    
-    dragVelocity = velocity;
     dragPrevious = dragCurrent;
     dragTimestamp = now;
     
     const dragDistance = dragCurrent - dragStart;
-    // Make maxDrag proportional to page width for better mobile UX
-    const pageWidth = rightPage.offsetWidth || window.innerWidth * 0.9;
-    const maxDrag = pageWidth * 0.3; // 30% of page width required to flip
-    const normalizedDrag = Math.max(-maxDrag, Math.min(maxDrag, dragDistance));
-    const progress = Math.min(Math.abs(normalizedDrag) / maxDrag, 1);
+    const threshold = isMobileDevice() || isTouch() ? MOBILE_DRAG_THRESHOLD : DESKTOP_DRAG_THRESHOLD;
+    const normalizedDrag = Math.max(-threshold * 3, Math.min(threshold * 3, dragDistance));
+    const progress = Math.min(Math.abs(normalizedDrag) / (threshold * 3), 1);
     
-    // SINGLE PAGE VIEW - always use rightPage for flip animation
     if (normalizedDrag < 0 && currentPage < numPages - 1) {
         // Dragging left - flip forward
-        applyPageCurl(rightPage, progress, 1);
+        applyPageCurl(currentPageEl, progress, 1);
     } else if (normalizedDrag > 0 && currentPage > 0) {
         // Dragging right - flip backward
-        applyPageCurl(rightPage, progress, -1);
+        applyPageCurl(currentPageEl, progress, -1);
     } else {
-        // Reset if can't flip
-        rightPage.style.transform = '';
-        rightPage.style.boxShadow = '';
-        rightPage.style.background = '';
+        // Can't flip - reset
+        currentPageEl.style.transform = '';
+        currentPageEl.style.boxShadow = '';
+        currentPageEl.style.background = '';
     }
 }
 
@@ -547,65 +477,40 @@ function handleDragEnd() {
     if (!isDragging) return;
     isDragging = false;
     
-    // Mobile flip cooldown - prevent rapid consecutive flips
+    const dragDistance = dragCurrent - dragStart;
+    console.log(`Drag ended: distance=${dragDistance}, currentPage=${currentPage}`);
+    
+    // Mobile flip cooldown
     const now = Date.now();
     if (isMobileDevice() || isTouch()) {
         if (now - lastFlipTime < MOBILE_FLIP_COOLDOWN) {
-            // Snap back if too soon after last flip
-            const dragDistance = dragCurrent - dragStart;
-            const pageWidth = rightPage.offsetWidth || window.innerWidth * 0.9;
-            const maxDrag = pageWidth * 0.3;
-            const normalizedDrag = Math.max(-maxDrag, Math.min(maxDrag, dragDistance));
-            const progress = Math.min(Math.abs(normalizedDrag) / maxDrag, 1);
-            const direction = dragDistance < 0 ? 1 : -1;
-            animateSnapBack(rightPage, progress, direction);
-            dragStart = 0;
-            dragCurrent = 0;
-            dragVelocity = 0;
+            console.log('Flip cooldown active, snapping back');
+            animateSnapBack();
             return;
         }
-        lastFlipTime = now;
     }
     
-    const dragDistance = dragCurrent - dragStart;
-    // Make maxDrag proportional to page width for better mobile UX
-    const pageWidth = rightPage.offsetWidth || window.innerWidth * 0.9;
-    const maxDrag = pageWidth * 0.3; // 30% of page width required to flip
-    const normalizedDrag = Math.max(-maxDrag, Math.min(maxDrag, dragDistance));
-    const progress = Math.min(Math.abs(normalizedDrag) / maxDrag, 1);
+    const threshold = isMobileDevice() || isTouch() ? MOBILE_DRAG_THRESHOLD : DESKTOP_DRAG_THRESHOLD;
     
-    // Use higher threshold on mobile devices
-    const dragThreshold = (isMobileDevice() || isTouch()) ? 0.4 : 0.3;
-    
-    // Calculate if momentum should complete the flip
-    const momentumThreshold = 0.3; // Velocity threshold
-    const momentumComplete = Math.abs(dragVelocity) > momentumThreshold;
-    
-    if (progress >= dragThreshold || momentumComplete) {
-        // User dragged past halfway OR has enough momentum - complete flip
+    // Check if dragged far enough
+    if (Math.abs(dragDistance) >= threshold) {
         if (dragDistance < 0 && currentPage < numPages - 1) {
             // Flip forward
-            completeFlipWithMomentum(rightPage, progress, 1, currentPage + 1, dragVelocity);
-            currentPage = currentPage + 1;
+            console.log('Flipping forward');
+            lastFlipTime = now;
+            flipToPage(currentPage + 1);
         } else if (dragDistance > 0 && currentPage > 0) {
             // Flip backward
-            completeFlipWithMomentum(rightPage, progress, -1, currentPage - 1, dragVelocity);
-            currentPage = currentPage - 1;
+            console.log('Flipping backward');
+            lastFlipTime = now;
+            flipToPage(currentPage - 1);
         } else {
-            // Can't flip, snap back
-            const direction = dragDistance < 0 ? 1 : -1;
-            animateSnapBack(rightPage, progress, direction);
-            dragStart = 0;
-            dragCurrent = 0;
-            dragVelocity = 0;
-            return;
+            console.log('Cannot flip, snapping back');
+            animateSnapBack();
         }
-        updateDisplay();
-        updateButtons();
     } else {
-        // Didn't drag far enough and no momentum - snap back smoothly
-        const direction = dragDistance < 0 ? 1 : -1;
-        animateSnapBack(rightPage, progress, direction);
+        console.log('Drag distance too small, snapping back');
+        animateSnapBack();
     }
     
     dragStart = 0;
@@ -613,139 +518,52 @@ function handleDragEnd() {
     dragVelocity = 0;
 }
 
-// Smooth snap-back animation when drag is cancelled
-function animateSnapBack(targetPage, startProgress, direction) {
-    isFlipping = true;
+// Smooth snap-back animation
+function animateSnapBack() {
     const startTime = performance.now();
-    const duration = 300;
+    const duration = 200;
     
     function animate(currentTime) {
         const elapsed = currentTime - startTime;
-        const rawProgress = Math.min(elapsed / duration, 1);
-        const easedProgress = easeInOutCubic(rawProgress);
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = easeInOutCubic(progress);
         
-        // Animate from startProgress back to 0
-        const currentProgress = startProgress * (1 - easedProgress);
+        currentPageEl.style.transform = `perspective(1500px) rotateY(${(1 - eased) * 10}deg)`;
+        currentPageEl.style.opacity = 0.7 + (eased * 0.3);
         
-        applyPageCurl(targetPage, currentProgress, direction);
-        
-        if (rawProgress < 1) {
-            animationFrame = requestAnimationFrame(animate);
+        if (progress < 1) {
+            requestAnimationFrame(animate);
         } else {
-            // Reset everything
-            targetPage.style.transform = '';
-            targetPage.style.boxShadow = '';
-            targetPage.style.background = '';
-            isFlipping = false;
+            currentPageEl.style.transform = '';
+            currentPageEl.style.boxShadow = '';
+            currentPageEl.style.background = '';
+            currentPageEl.style.opacity = '';
         }
     }
     
-    animationFrame = requestAnimationFrame(animate);
+    requestAnimationFrame(animate);
 }
 
-function resetPageTransforms() {
-    leftPage.style.transition = 'all 0.3s ease-out';
-    rightPage.style.transition = 'all 0.3s ease-out';
-    
-    setTimeout(() => {
-        leftPage.style.transform = '';
-        rightPage.style.transform = '';
-        leftPage.style.boxShadow = '';
-        rightPage.style.boxShadow = '';
-        leftPage.style.background = '';
-        rightPage.style.background = '';
-        
-        setTimeout(() => {
-            leftPage.style.transition = '';
-            rightPage.style.transition = '';
-        }, 300);
-    }, 10);
-}
+// Touch event listeners
+book.addEventListener('touchstart', (e) => {
+    handleDragStart(e);
+}, { passive: false });
 
-// Pinch-to-zoom functionality for touch devices
-let initialPinchDistance = 0;
-let currentPinchScale = 1;
-let pinchStartScale = 1;
+book.addEventListener('touchmove', (e) => {
+    handleDragMove(e);
+}, { passive: false });
 
-function getPinchDistance(e) {
-    if (e.touches.length < 2) return 0;
-    const touch1 = e.touches[0];
-    const touch2 = e.touches[1];
-    const dx = touch1.clientX - touch2.clientX;
-    const dy = touch1.clientY - touch2.clientY;
-    return Math.sqrt(dx * dx + dy * dy);
-}
+book.addEventListener('touchend', (e) => {
+    handleDragEnd();
+}, { passive: false });
 
-function handlePinchStart(e) {
-    if (e.touches.length === 2) {
-        initialPinchDistance = getPinchDistance(e);
-        pinchStartScale = scale;
-    }
-}
-
-function handlePinchMove(e) {
-    if (e.touches.length === 2 && initialPinchDistance > 0) {
-        e.preventDefault();
-        const currentDistance = getPinchDistance(e);
-        const scaleFactor = currentDistance / initialPinchDistance;
-        
-        // Calculate new scale (min 1x, max 3x)
-        currentPinchScale = Math.min(Math.max(pinchStartScale * scaleFactor, 1), 3);
-        
-        // Apply zoom to current page
-        const currentPageElement = currentPage === 0 ? leftPage : rightPage;
-        if (currentPageElement) {
-            currentPageElement.style.transform = `scale(${currentPinchScale})`;
-            // Adjust transform origin to center
-            currentPageElement.style.transformOrigin = 'center';
-            currentPageElement.style.transition = 'none';
-        }
-    }
-}
-
-function handlePinchEnd(e) {
-    if (e.touches.length < 2) {
-        initialPinchDistance = 0;
-        scale = currentPinchScale;
-        
-        // Smooth transition back if zoomed out
-        const currentPageElement = currentPage === 0 ? leftPage : rightPage;
-        if (currentPageElement) {
-            currentPageElement.style.transition = 'transform 0.3s ease-out';
-        }
-    }
-}
-
-// Add event listeners for drag/swipe
+// Mouse event listeners
 book.addEventListener('mousedown', handleDragStart);
 book.addEventListener('mousemove', handleDragMove);
 book.addEventListener('mouseup', handleDragEnd);
 book.addEventListener('mouseleave', handleDragEnd);
 
-book.addEventListener('touchstart', (e) => {
-    if (e.touches.length === 2) {
-        handlePinchStart(e);
-    } else {
-        handleDragStart(e);
-    }
-}, { passive: false });
-
-book.addEventListener('touchmove', (e) => {
-    if (e.touches.length === 2) {
-        handlePinchMove(e);
-    } else {
-        handleDragMove(e);
-    }
-}, { passive: false });
-
-book.addEventListener('touchend', (e) => {
-    if (e.touches.length < 2) {
-        handlePinchEnd(e);
-    }
-    handleDragEnd();
-});
-
-// Add visual cursor feedback
+// Visual cursor feedback
 book.style.cursor = 'grab';
 book.addEventListener('mousedown', () => {
     if (!isFlipping) book.style.cursor = 'grabbing';
@@ -764,8 +582,8 @@ document.addEventListener('keydown', (e) => {
 });
 
 // Initialize display
-// Ensure initial page cache is set for cover
 pageCache[0] = 'assets/front-cover.jpg';
-pageCache[1] = 'assets/back-cover.jpg';
 updateDisplay();
 updateButtons();
+
+console.log('Flip book initialized');
