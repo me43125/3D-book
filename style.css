@@ -182,6 +182,10 @@ body {
     transform-origin: right center;
     flex: 0 !important;
     min-width: 0 !important;
+    max-width: 0 !important;
+    position: absolute !important;
+    left: -9999px !important;
+    top: -9999px !important;
 }
 
 .right-page {
@@ -190,6 +194,8 @@ body {
     max-width: 100% !important;
     flex: 1 !important;
     flex-grow: 1 !important;
+    display: block !important;
+    visibility: visible !important;
 }
 
 .page.flipping-left {
@@ -329,10 +335,33 @@ body {
         height: 100dvh;
     }
     
+    /* FORCE single page view on mobile */
+    .left-page {
+        display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        overflow: hidden !important;
+        flex: 0 !important;
+        position: absolute !important;
+        left: -9999px !important;
+        top: -9999px !important;
+    }
+    
+    .right-page {
+        width: 100% !important;
+        max-width: 100% !important;
+        display: block !important;
+        visibility: visible !important;
+    }
+    
     .header { 
         padding: 0.4rem 0.5rem;
         flex-shrink: 0;
-        background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
+        background: #fef3c7;
     }
     .header h1 { 
         font-size: 1rem;
@@ -354,6 +383,7 @@ body {
         flex: 1;
         overflow: hidden;
         width: 100%;
+        padding: 0;
     }
     
     .control-btn { 
@@ -388,11 +418,6 @@ body {
         flex-grow: 0 !important;
     }
     
-    .right-page {
-        width: auto !important;
-        max-width: 98% !important;
-    }
-    
     .page-number { 
         font-size: 0.6rem;
         padding: 0.1rem 0.25rem;
@@ -403,12 +428,6 @@ body {
     .book-spine { display: none; }
     
     .thumbnails { display: none !important; }
-    
-    .book-container {
-        flex: 1;
-        overflow: hidden;
-        padding: 0;
-    }
 }
 
 @media (max-width: 400px) {
