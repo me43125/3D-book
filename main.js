@@ -299,12 +299,19 @@ function updateDisplay() {
     leftPage.style.background = '';
     rightPage.style.background = '';
     
-    // SINGLE PAGE VIEW - only show right page with current page content
+    // SINGLE PAGE VIEW - forcefully hide left page
     leftPageImg.src = '';
     leftPageNum.style.display = 'none';
     leftPage.style.display = 'none';
+    leftPage.style.visibility = 'hidden';
+    leftPage.style.width = '0';
+    leftPage.style.height = '0';
+    leftPage.style.margin = '0';
+    leftPage.style.padding = '0';
     
+    // Show right page
     rightPage.style.display = 'block';
+    rightPage.style.visibility = 'visible';
     rightPageNum.style.display = 'block';
     rightPageNum.textContent = currentPage + 1;
     rightPage.style.width = '';
