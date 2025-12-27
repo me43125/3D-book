@@ -246,7 +246,7 @@ async function processPDF(arrayBuffer) {
         renderPageToImage(1);
         renderPageToImage(2);
         
-        updateDisplay();
+        await updateDisplay();
         updateThumbnails();
         updateButtons();
         
@@ -275,16 +275,20 @@ pdfUpload.addEventListener('change', async (e) => {
 });
 
 // Update page display - SINGLE PAGE VIEW
-function updateDisplay() {
+async function updateDisplay() {
     console.log(`========================================`);
     console.log(`UPDATE DISPLAY: currentPage=${currentPage}, numPages=${numPages}`);
     console.log(`Page in cache? ${!!pageCache[currentPage]}`);
+    if (pageCache[currentPage]) {
+        console.log(`Cache contains: ${pageCache[currentPage].substring(0, 50)}...`);
+    }
     console.log(`========================================`);
     
     // Reset transforms and shadows
     currentPageEl.style.transform = '';
     currentPageEl.style.boxShadow = '';
     currentPageEl.style.background = '';
+    currentPageEl.style.opacity = '1';
     
     // Update page number
     currentPageNum.textContent = currentPage + 1;
@@ -293,22 +297,28 @@ function updateDisplay() {
     const pageToLoad = currentPage;
     
     if (pageCache[pageToLoad]) {
-        currentPageImg.src = pageCache[pageToLoad];
-        console.log(`✓ Loaded cached page ${pageToLoad}`);
+        // Force image update
+        const cachedSrc = pageCache[pageToLoad];
+        console.log(`✓ Loading cached page ${pageToLoad}, src length: ${cachedSrc.length}`);
+        currentPageImg.src = '';
+        // Small delay to force browser refresh
+        setTimeout(() => {
+            currentPageImg.src = cachedSrc;
+            console.log(`✓ Image src set for page ${pageToLoad}`);
+        }, 10);
     } else {
         // Show placeholder while loading
-        currentPageImg.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23f0f0f0%22 width=%22100%22 height=%22100%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22%3ELoading...%3C/text%3E%3C/svg%3E';
+        currentPageImg.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22500%22%3E%3Crect fill=%22%23f0f0f0%22 width=%22400%22 height=%22500%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2224%22 fill=%22%23666%22%3ELoading page ' + (pageToLoad + 1) + '...%3C/text%3E%3C/svg%3E';
         console.log(`⏳ Rendering page ${pageToLoad}...`);
         
-        renderPageToImage(pageToLoad).then(img => {
-            if (img && pageToLoad === currentPage) {
+        const img = await renderPageToImage(pageToLoad);
+        if (img && pageToLoad === currentPage) {
+            currentPageImg.src = '';
+            setTimeout(() => {
                 currentPageImg.src = img;
-                pageCache[pageToLoad] = img;
-                console.log(`✓ Successfully loaded page ${pageToLoad}`);
-            }
-        }).catch(err => {
-            console.error('❌ Error rendering page:', pageToLoad, err);
-        });
+                console.log(`✓ Successfully displayed page ${pageToLoad}`);
+            }, 10);
+        }
     }
     
     pageInfo.textContent = `Page ${currentPage + 1} of ${numPages}`;
@@ -361,7 +371,7 @@ function updateButtons() {
 }
 
 // Animated flip to specific page
-function flipToPage(pageNum) {
+async function flipToPage(pageNum) {
     console.log(`🔄 flipToPage called: pageNum=${pageNum}, currentPage=${currentPage}, isFlipping=${isFlipping}`);
     
     if (isFlipping || pageNum < 0 || pageNum >= numPages) {
@@ -391,10 +401,10 @@ function flipToPage(pageNum) {
             animationFrame = requestAnimationFrame(animate);
         } else {
             currentPage = pageNum;
-            updateDisplay();
-            updateButtons();
             isFlipping = false;
             console.log(`✓ Flip complete, now on page ${currentPage}`);
+            updateDisplay();
+            updateButtons();
         }
     }
     
