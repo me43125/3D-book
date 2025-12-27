@@ -1,0 +1,20 @@
+{
+  "name": "3d-flip-book",
+  "version": "1.0.0",
+  "description": "3D Interactive Flip Book with PDF Support",
+  "main": "main.js",
+  "scripts": {
+    "build": "echo 'Static site - no build needed'"
+  },
+  "engines": {
+    "node": "18.x"
+  },
+  "keywords": [
+    "flipbook",
+    "3d",
+    "pdf",
+    "interactive"
+  ],
+  "author": "",
+  "license": "MIT"
+}
